@@ -31,6 +31,11 @@ from transform.cleaning_rules import clean_rows, load_raw_csv, write_cleaned_csv
 
 load_dotenv()
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parent
 RAW_DEFAULT = ROOT / "data" / "raw" / "policy_export_dirty.csv"
 ART = ROOT / "artifacts"

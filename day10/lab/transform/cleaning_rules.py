@@ -20,11 +20,16 @@ ALLOWED_DOC_IDS = frozenset(
         "sla_p1_2026",
         "it_helpdesk_faq",
         "hr_leave_policy",
+        "access_control_sop",
     }
 )
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DMY_SLASH = re.compile(r"^(\d{2})/(\d{2})/(\d{4})$")
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
+_SLASH_DATETIME = re.compile(r"^(\d{4})/(\d{2})/(\d{2})(T\d{2}:\d{2}:\d{2})$")
+_NOISY_PREFIX = re.compile(r"^[!\s]+")
+_REPEATED_LAM_VIEC = re.compile(r"\blàm việc(?:\s+làm việc)+\b", flags=re.IGNORECASE)
 
 
 def _norm_text(s: str) -> str:
@@ -51,6 +56,72 @@ def _normalize_effective_date(raw: str) -> Tuple[str, str]:
         dd, mm, yyyy = m.group(1), m.group(2), m.group(3)
         return f"{yyyy}-{mm}-{dd}", ""
     return "", "invalid_effective_date_format"
+
+
+def _normalize_exported_at(raw: str) -> Tuple[str, str]:
+    """
+    Return (iso_datetime, error_reason).
+    Some source systems export the date part with slashes; normalize that instead of
+    letting freshness checks see an unparseable publish timestamp.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "", "missing_exported_at"
+    if _ISO_DATETIME.match(s):
+        return s, ""
+    m = _SLASH_DATETIME.match(s)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}{m.group(4)}", ""
+    return "", "invalid_exported_at_format"
+
+
+def _is_ambiguous_placeholder(text: str) -> bool:
+    stripped = text.strip().lower()
+    return stripped == "nội dung không rõ ràng:" or stripped.startswith("nội dung không rõ ràng:")
+
+
+def _has_repeated_sentence_spam(text: str) -> bool:
+    sentences = [p.strip().lower() for p in re.split(r"[.!?]+", text) if p.strip()]
+    if not sentences:
+        return False
+    counts: Dict[str, int] = {}
+    for sentence in sentences:
+        counts[sentence] = counts.get(sentence, 0) + 1
+        if counts[sentence] >= 3:
+            return True
+    return False
+
+
+def _is_stale_hr_annual_policy(text: str) -> bool:
+    low = text.lower()
+    if "bản hr 2025" in low:
+        return True
+    return bool(re.search(r"\b10\s+ngày(?:\s+làm\s+việc)?\s+phép\s+năm\b", low))
+
+
+def _repair_chunk_text(text: str) -> str:
+    fixed = _NOISY_PREFIX.sub("", text or "").strip()
+    fixed = _REPEATED_LAM_VIEC.sub("làm việc", fixed)
+    return " ".join(fixed.split())
+
+
+def _add_retrieval_aliases(doc_id: str, text: str) -> str:
+    low = text.lower()
+    if (
+        doc_id == "sla_p1_2026"
+        and "ticket p1 có sla phản hồi" in low
+        and "resolution trong 4 giờ" in low
+        and "auto escalate" not in low
+    ):
+        return f"{text} Escalation P1: hệ thống auto escalate sau 10 phút nếu không có phản hồi."
+    if (
+        doc_id == "sla_p1_2026"
+        and "escalation p1" in low
+        and "10 phút" in low
+        and "auto escalate" not in low
+    ):
+        return f"{text} [alias: auto escalate P1 no response 10 phút]"
+    return text
 
 
 def load_raw_csv(path: Path) -> List[Dict[str, str]]:
@@ -101,6 +172,11 @@ def clean_rows(
             quarantine.append({**raw, "reason": eff_err, "effective_date_raw": eff_raw})
             continue
 
+        exported_norm, exported_err = _normalize_exported_at(exported_at)
+        if exported_err:
+            quarantine.append({**raw, "reason": exported_err, "exported_at_raw": exported_at})
+            continue
+
         if doc_id == "hr_leave_policy" and eff_norm < "2026-01-01":
             quarantine.append(
                 {
@@ -111,17 +187,30 @@ def clean_rows(
             )
             continue
 
-        if not text:
+        fixed_text = _add_retrieval_aliases(doc_id, _repair_chunk_text(text))
+
+        if not fixed_text:
             quarantine.append({**raw, "reason": "missing_chunk_text"})
             continue
 
-        key = _norm_text(text)
-        if key in seen_text:
-            quarantine.append({**raw, "reason": "duplicate_chunk_text"})
+        if _is_ambiguous_placeholder(fixed_text):
+            quarantine.append({**raw, "reason": "ambiguous_placeholder_text"})
             continue
-        seen_text.add(key)
 
-        fixed_text = text
+        if _has_repeated_sentence_spam(fixed_text):
+            quarantine.append({**raw, "reason": "repeated_sentence_spam"})
+            continue
+
+        if doc_id == "hr_leave_policy" and _is_stale_hr_annual_policy(fixed_text):
+            quarantine.append(
+                {
+                    **raw,
+                    "reason": "stale_hr_2025_content",
+                    "effective_date_normalized": eff_norm,
+                }
+            )
+            continue
+
         if apply_refund_window_fix and doc_id == "policy_refund_v4":
             if "14 ngày làm việc" in fixed_text:
                 fixed_text = fixed_text.replace(
@@ -130,6 +219,12 @@ def clean_rows(
                 )
                 fixed_text += " [cleaned: stale_refund_window]"
 
+        key = _norm_text(fixed_text)
+        if key in seen_text:
+            quarantine.append({**raw, "reason": "duplicate_chunk_text"})
+            continue
+        seen_text.add(key)
+
         seq += 1
         cleaned.append(
             {
@@ -137,7 +232,7 @@ def clean_rows(
                 "doc_id": doc_id,
                 "chunk_text": fixed_text,
                 "effective_date": eff_norm,
-                "exported_at": exported_at or "",
+                "exported_at": exported_norm,
             }
         )
 

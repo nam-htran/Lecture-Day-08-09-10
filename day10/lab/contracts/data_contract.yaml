@@ -1,19 +1,18 @@
-# Data contract — Lab Day 10 (tiếp nối artifact CS + IT Helpdesk)
-# Sinh viên bổ sung owner, SLA freshness, và nguồn canonical.
+# Data contract - Lab Day 10
 
-version: "1.0"
+version: "1.1"
 dataset: "kb_chunk_export"
-owner_team: "__TODO__"
+owner_team: "Day10 Pipeline Group"
 
 schema_cleaned:
   chunk_id:
     type: string
     required: true
-    description: "ID ổn định sau clean (thường hash hoặc doc_id + seq)"
+    description: "Stable id generated from doc_id, repaired chunk_text, and sequence."
   doc_id:
     type: string
     required: true
-    description: "Khóa logic tài liệu nguồn (vd policy_refund_v4)"
+    description: "Canonical document key used by retrieval and grading."
   chunk_text:
     type: string
     required: true
@@ -22,39 +21,70 @@ schema_cleaned:
   effective_date:
     type: date
     required: true
+    format: "YYYY-MM-DD"
   exported_at:
     type: datetime
     required: true
+    format: "YYYY-MM-DDTHH:MM:SS"
 
 quality_rules:
+  - id: "allowed_doc_id_catalog"
+    description: "Only registered canonical source documents are published."
+    severity: "halt"
+  - id: "normalize_effective_date"
+    description: "Convert dd/mm/yyyy to ISO date; quarantine missing or invalid dates."
+    severity: "halt"
+  - id: "normalize_exported_at"
+    description: "Convert slash timestamp date parts to ISO datetime for freshness checks."
+    severity: "halt"
   - id: "no_duplicate_chunk_text"
+    description: "After repair, duplicate chunk text is quarantined before embedding."
     severity: "warn"
   - id: "no_stale_refund_window"
-    description: "Không được để chunk policy refund chứa cửa sổ 14 ngày (lệch so với v4 = 7 ngày)"
+    description: "Refund policy must not publish the stale 14-day window."
+    severity: "halt"
+  - id: "no_hr_2025_marker"
+    description: "HR annual leave 2025 content must not reach cleaned output."
+    severity: "halt"
+  - id: "canonical_doc_coverage"
+    description: "Cleaned data must contain all five canonical source docs."
+    severity: "halt"
+  - id: "sla_p1_auto_escalate_10min_present"
+    description: "P1 escalation retrieval context must contain 10-minute auto-escalate evidence."
     severity: "halt"
 
 freshness:
-  measured_at: "publish"  # ingest | cleaned | publish
+  measured_at: "publish"
   sla_hours: 24
-  alert_channel: "__TODO__"
+  alert_channel: "course-lab-runbook"
+  note: "The sample export is intentionally stale on 2026-06-10; FAIL is expected and documented."
 
 canonical_sources:
   - path: "data/docs/policy_refund_v4.txt"
     doc_id: "policy_refund_v4"
+    owner: "CS"
   - path: "data/docs/sla_p1_2026.txt"
     doc_id: "sla_p1_2026"
+    owner: "IT Operations"
   - path: "data/docs/it_helpdesk_faq.txt"
     doc_id: "it_helpdesk_faq"
+    owner: "IT Helpdesk"
   - path: "data/docs/hr_leave_policy.txt"
     doc_id: "hr_leave_policy"
+    owner: "HR"
+  - path: "data/docs/access_control_sop.txt"
+    doc_id: "access_control_sop"
+    owner: "IT Security"
 
-# Baseline allowlist export — nhóm mở rộng doc mới phải đồng bộ cleaning_rules + contract.
 allowed_doc_ids:
   - policy_refund_v4
   - sla_p1_2026
   - it_helpdesk_faq
   - hr_leave_policy
+  - access_control_sop
 
-# Merit/Distinction: có thể đưa cutoff versioning vào env và tham chiếu ở đây (tránh hard-code trong code).
 policy_versioning:
+  refund_expected_window_days: 7
   hr_leave_min_effective_date: "2026-01-01"
+  sla_p1_effective_date: "2026-01-15"
+  access_control_effective_date: "2026-01-01"
