@@ -1,11 +1,10 @@
-# Bao cao nhom - Lab Day 10: Data Pipeline & Data Observability
+# Bao cao nop bai ca nhan - Lab Day 10: Data Pipeline & Data Observability
 
-**Ten nhom:** Day10 Pipeline Group  
-**Thanh vien:**
+> File van giu ten `reports/group_report.md` theo skeleton lab, nhung noi dung duoc viet cho bai nop ca nhan.
 
-| Ten | Vai tro (Day 10) | Email |
-|-----|------------------|-------|
-| Nam | Cleaning, Quality, Embed, Monitoring | _dien email_ |
+**Nguoi nop:** Nam  
+**Vai tro:** Ingestion, Cleaning, Quality, Embed, Monitoring, Docs  
+**Email:** _dien email_
 
 **Ngay nop:** 2026-06-10  
 **Run clean cuoi:** `day10-idempotent-rerun`  
@@ -23,7 +22,7 @@ Luong chinh la ingest CSV, clean/quarantine, validate expectation, embed vao Chr
 
 ## 2. Cleaning & expectation
 
-Baseline bi halt: `baseline-before` clean 40 rows, quarantine 207 rows, nhung `hr_leave_no_stale_10d_annual` fail 2 violations. Nhom sua `transform/cleaning_rules.py` de them source hop le `access_control_sop`, normalize `exported_at`, quarantine ambiguous placeholder, repeated sentence spam, stale HR 2025 content, va them retrieval alias hep cho SLA P1 escalation. `quality/expectations.py` duoc bo sung coverage/semantic checks: unique chunk id, du 5 canonical docs, khong con HR 2025 marker, exported_at ISO datetime, Access Level 4 present, va P1 auto-escalate 10 phut present.
+Baseline bi halt: `baseline-before` clean 40 rows, quarantine 207 rows, nhung `hr_leave_no_stale_10d_annual` fail 2 violations. Toi sua `transform/cleaning_rules.py` de them source hop le `access_control_sop`, normalize `exported_at`, quarantine ambiguous placeholder, repeated sentence spam, stale HR 2025 content, va them retrieval alias hep cho SLA P1 escalation. `quality/expectations.py` duoc bo sung coverage/semantic checks: unique chunk id, du 5 canonical docs, khong con HR 2025 marker, exported_at ISO datetime, Access Level 4 present, va P1 auto-escalate 10 phut present.
 
 ### 2a. Bang metric_impact
 
@@ -63,5 +62,5 @@ Collection `day10_kb` la corpus sach cho retriever/agent cua Day 09. Day 09 khon
 
 - Chua co orchestration that nhu Airflow/Dagster; hien la CLI reproducible.
 - Freshness chi dua vao manifest, chua doc watermark truc tiep tu source system.
-- Chua co owner/email that cua tung team; can dien neu nop theo nhom dong nguoi.
+- Chua dien email that cua nguoi nop.
 - Chroma DB local bi ignore trong git; khi cham can rerun pipeline hoac nop artifact theo yeu cau GV.

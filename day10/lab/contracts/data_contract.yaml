@@ -2,7 +2,7 @@
 
 version: "1.1"
 dataset: "kb_chunk_export"
-owner_team: "Day10 Pipeline Group"
+owner_team: "Nam - Individual Submission"
 
 schema_cleaned:
   chunk_id:

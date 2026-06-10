@@ -1,6 +1,6 @@
 # Kien truc pipeline - Lab Day 10
 
-**Nhom:** Day10 Pipeline Group  
+**Nguoi nop:** Nam  
 **Cap nhat:** 2026-06-10  
 **Run cuoi:** `day10-idempotent-rerun`
 
@@ -26,11 +26,11 @@ flowchart LR
 
 | Thanh phan | Input | Output | Owner |
 |------------|-------|--------|-------|
-| Ingest | `data/raw/policy_export_dirty.csv` | list row raw | Ingestion Owner |
-| Transform | raw rows | cleaned CSV + quarantine CSV | Cleaning Owner |
-| Quality | cleaned rows | expectation result + halt decision | Quality Owner |
-| Embed | cleaned CSV | Chroma collection `day10_kb` | Embed Owner |
-| Monitor | manifest JSON | PASS/WARN/FAIL freshness | Monitoring Owner |
+| Ingest | `data/raw/policy_export_dirty.csv` | list row raw | Nam |
+| Transform | raw rows | cleaned CSV + quarantine CSV | Nam |
+| Quality | cleaned rows | expectation result + halt decision | Nam |
+| Embed | cleaned CSV | Chroma collection `day10_kb` | Nam |
+| Monitor | manifest JSON | PASS/WARN/FAIL freshness | Nam |
 
 ## 3. Idempotency & rerun
 
